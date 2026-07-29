@@ -29,7 +29,10 @@
         </a-assets>
 
         <!-- GPS-камера с компасом -->
-        <a-camera gps-camera rotation-reader></a-camera>
+        <a-camera 
+    gps-camera="near: 0.1; far: 1000; minDistance: 0;" 
+    rotation-reader>
+</a-camera>
         
         <!-- 
             Модель арки, привязанная к гео-точке.
@@ -41,7 +44,8 @@
             gltf-model="#arcaModel"
             scale="8 8 8"
             rotation="0 0 0"
-            position="0 0 0">
+            position="0 0 0"
+            frustum-culled="false">
         </a-entity>
 
     </a-scene>
