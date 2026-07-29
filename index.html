@@ -2,13 +2,13 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Arca AR - MindAR</title>
+    <title>Arca Geo AR - Este</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <!-- MindAR library -->
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <!-- AR.js для Location-Based AR -->
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 
     <style>
         body {
@@ -20,32 +20,30 @@
 
 <body>
     <a-scene
-        mindar-image="imageTargetSrc: ./targets.mind;"
-        color-space="sRGB"
-        renderer="colorManagement: true, physicallyCorrectLights"
         vr-mode-ui="enabled: false"
-        device-orientation-permission-ui="enabled: false">
+        arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;">
         
         <a-assets>
-            <!-- Загружаем модель -->
-            <a-asset-item id="capModel" src="arcageo.glb"></a-asset-item>
+            <!-- Загружаем модель арки -->
+            <a-asset-item id="arcaModel" src="arcageo.glb"></a-asset-item>
         </a-assets>
 
-        <!-- Камера MindAR -->
-        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
-        <!-- Маркер (берется первый целевой объект из targets.mind) -->
-        <a-entity mindar-image-target="targetIndex: 0">
-            
-            <!-- Ваша кепка -->
-            <a-gltf-model
-                src="#capModel"
-                position="0 6 0"
-                scale="1 1 1"
-                rotation="45 0 0">
-            </a-gltf-model>
-
+        <!-- GPS-камера с компасом -->
+        <a-camera gps-camera rotation-reader></a-camera>
+        
+        <!-- 
+            Модель арки, привязанная к гео-точке.
+            В Geo-AR 1 единица = 1 метр! 
+            Ваша арка из Blender (~5.7 м в высоту) при scale="1 1 1" будет ровно в реальный размер.
+        -->
+        <a-entity
+            gps-entity-place="latitude: 45.22850; longitude: 11.65660;"
+            gltf-model="#arcaModel"
+            scale="1 1 1"
+            rotation="0 0 0"
+            position="0 0 0">
         </a-entity>
+
     </a-scene>
 </body>
 </html>
