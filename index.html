@@ -30,9 +30,11 @@
 
         <!-- GPS-камера с компасом -->
         <a-camera 
-    gps-camera="near: 0.1; far: 1000; minDistance: 0;" 
+    camera="near: 0.1; far: 1000;" 
+    gps-camera="enableHighAccuracy: true; positionMinAccuracy: 1000; minDistance: 0;" 
     rotation-reader>
 </a-camera>
+
         
         <!-- 
             Модель арки, привязанная к гео-точке.
