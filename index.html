@@ -4,30 +4,12 @@
     <meta charset="utf-8">
     <title>Arca WebAR Anchor - Este</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    
+
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
     <style>
         body { margin: 0; overflow: hidden; }
-        
-        #reset-btn {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 999;
-            padding: 12px 24px;
-            background: #ffffff;
-            color: #000000;
-            border: 2px solid #333;
-            border-radius: 25px;
-            font-family: sans-serif;
-            font-size: 14px;
-            font-weight: bold;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-            display: none;
-        }
 
         .hide-scanning .mindar-ui-scanning {
             display: none !important;
@@ -36,18 +18,13 @@
 </head>
 
 <body>
-    <button id="reset-btn" onclick="location.reload()">Зафиксировать заново</button>
 
-    <a-scene 
-        mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: yes;" 
-        color-space="sRGB" 
-        renderer="colorManagement: true, physicallyCorrectLights" 
-        vr-mode-ui="enabled: false" 
+    <a-scene
+        mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: yes;"
+        color-space="sRGB"
+        renderer="colorManagement: true, physicallyCorrectLights"
+        vr-mode-ui="enabled: false"
         device-orientation-permission-ui="enabled: true">
-
-        <!-- <a-assets>
-            <a-asset-item id="arcaModel" src="arcageo.glb"></a-asset-item>
-        </a-assets> -->
 
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
@@ -60,121 +37,40 @@
                 position="0.95 0 0.05"
                 rotation="0 0 0"
                 scale="0.16 0.16 0.16">
+
+                <!-- Модель теперь ЖИВЁТ внутри маркера, а не копируется в корень сцены.
+                     MindAR сам обновляет трансформацию #target каждый кадр,
+                     поэтому модель будет корректно "стоять на месте" в пространстве
+                     всё то время, пока маркер трекается — можно свободно обходить её вокруг. -->
+                <a-gltf-model
+                    id="archModel"
+                    src="./arcageo.glb">
+                </a-gltf-model>
+
             </a-entity>
 
         </a-entity>
 
-        <a-gltf-model
-            id="archModel"
-            src="./arcageo.glb"
-            visible="false">
-        </a-gltf-model>
-
-        <a-entity id="frozenAnchor" visible="false"></a-entity>
-
-        <a-box
-            position="0 0 0.1"
-            scale="0.2 0.2 0.2"
-            color="red">
-        </a-box>
     </a-scene>
 
     <script>
-        const sceneEl = document.querySelector('a-scene');
-        const target = document.querySelector('#target');
-        const placement = document.querySelector('#placement');
         const archModel = document.querySelector('#archModel');
-        const resetBtn = document.querySelector('#reset-btn');
-    
-        let targetVisible = false;
-        let modelReady = Boolean(archModel.getObject3D('mesh'));
-        let isAnchored = false;
-        let freezeScheduled = false;
-    
-        const worldPosition = new THREE.Vector3();
-        const worldQuaternion = new THREE.Quaternion();
-        const worldScale = new THREE.Vector3();
-    
-        function tryFreezeModel() {
-            if (
-                isAnchored ||
-                freezeScheduled ||
-                !targetVisible ||
-                !modelReady
-            ) {
-                return;
-            }
-    
-            freezeScheduled = true;
-    
-            // Ждём, чтобы MindAR успел обновить трансформацию маркера
-            requestAnimationFrame(() => {
-                freezeScheduled = false;
-    
-                if (isAnchored || !targetVisible || !modelReady) {
-                    return;
-                }
-    
-                // Обновляем мировые матрицы всей сцены
-                sceneEl.object3D.updateMatrixWorld(true);
-                placement.object3D.updateWorldMatrix(true, false);
-    
-                // Получаем мировое положение точки placement
-                placement.object3D.matrixWorld.decompose(
-                    worldPosition,
-                    worldQuaternion,
-                    worldScale
-                );
-    
-                // Модель уже находится в корне сцены,
-                // поэтому просто присваиваем ей мировую трансформацию
-                archModel.object3D.position.copy(worldPosition);
-                archModel.object3D.quaternion.copy(worldQuaternion);
-                archModel.object3D.scale.copy(worldScale);
-    
-                archModel.object3D.updateMatrix();
-                archModel.object3D.updateMatrixWorld(true);
-    
-                archModel.setAttribute('visible', true);
-                archModel.object3D.visible = true;
-    
-                document.body.classList.add('hide-scanning');
-    
-                isAnchored = true;
-                resetBtn.style.display = 'block';
-    
-                console.log('Арка зафиксирована', {
-                    position: worldPosition.clone(),
-                    quaternion: worldQuaternion.clone(),
-                    scale: worldScale.clone()
-                });
-            });
-        }
-    
+        const target = document.querySelector('#target');
+
         archModel.addEventListener('model-loaded', () => {
-            modelReady = true;
             console.log('GLB успешно загружен');
-            tryFreezeModel();
         });
-    
+
         archModel.addEventListener('model-error', event => {
-            console.error(
-                'Ошибка загрузки GLB:',
-                event.detail || event
-            );
+            console.error('Ошибка загрузки GLB:', event.detail || event);
         });
-    
+
         target.addEventListener('targetFound', () => {
             console.log('Маркер найден');
-            targetVisible = true;
-            tryFreezeModel();
         });
-    
+
         target.addEventListener('targetLost', () => {
             console.log('Маркер потерян');
-            targetVisible = false;
-    
-            // После фиксации арку не скрываем
         });
     </script>
 </body>
