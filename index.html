@@ -28,11 +28,16 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.4);
             display: none;
         }
+
+        /* Скрываем рамку сканирования после того, как маркер поймали */
+        .hide-scanning .mindar-ui-scanning {
+            display: none !important;
+        }
     </style>
 </head>
 
 <body>
-    <button id="reset-btn" onclick="location.reload()">Сбросить позицию</button>
+    <button id="reset-btn" onclick="location.reload()">Зафиксировать заново</button>
 
     <a-scene 
         mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: yes;" 
@@ -69,7 +74,7 @@
         target.addEventListener("targetFound", () => {
             if (isAnchored) return;
 
-            // 1. Фиксируем глобальные координаты модели относительно мира
+            // 1. Считываем координаты модели в пространстве кадра
             const worldPosition = new THREE.Vector3();
             const worldQuaternion = new THREE.Quaternion();
             const worldScale = new THREE.Vector3();
@@ -78,19 +83,16 @@
             archModel.object3D.getWorldQuaternion(worldQuaternion);
             archModel.object3D.getWorldScale(worldScale);
 
-            // 2. Вынимаем арку из маркера и переносим в глобальную сцену
+            // 2. Вынимаем модель из маркера и переносим прямо в сцену
             scene.object3D.add(archModel.object3D);
 
-            // 3. Применяем координаты
+            // 3. Задаем ей мировые координаты
             archModel.object3D.position.copy(worldPosition);
             archModel.object3D.quaternion.copy(worldQuaternion);
             archModel.object3D.scale.copy(worldScale);
 
-            // 4. Полностью отключаем сканер MindAR, чтобы он больше не искал маркер
-            const mindarSystem = scene.systems["mindar-image-system"];
-            if (mindarSystem) {
-                mindarSystem.stop();
-            }
+            // 4. Скрываем рамку сканера, НЕ выключая трансляцию видео
+            document.body.classList.add('hide-scanning');
 
             isAnchored = true;
             resetBtn.style.display = 'block';
