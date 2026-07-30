@@ -41,7 +41,7 @@
     <a-scene 
         mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: yes;" 
         color-space="sRGB" 
-        renderer="colorManagement: true, physicallyCorrectLights" 
+        renderer="colorManagement: true, physicallyCorrectLights: false" 
         vr-mode-ui="enabled: false" 
         device-orientation-permission-ui="enabled: true">
 
@@ -49,9 +49,14 @@
             <a-asset-item id="arcaModel" src="arcageo.glb"></a-asset-item>
         </a-assets>
 
+        <a-light type="ambient" intensity="1.5"></a-light>
+        <a-light type="directional" position="1 4 2" intensity="1.0"></a-light>
+
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-        <a-entity id="target" mindar-image-target="targetIndex: 0">
+        <a-entity id="target" mindar-image-target="targetIndex: 0"></a-entity>
+
+        <a-entity id="frozenAnchor" visible="false">
             <a-gltf-model 
                 id="archModel" 
                 src="#arcaModel" 
@@ -61,98 +66,46 @@
             </a-gltf-model>
         </a-entity>
 
-        <a-entity id="frozenAnchor" visible="false"></a-entity>
-
-        <a-box
-            position="0 0 0.1"
-            scale="0.2 0.2 0.2"
-            color="red">
-        </a-box>
     </a-scene>
 
     <script>
-        const sceneEl = document.querySelector('a-scene');
         const target = document.querySelector('#target');
-        const archModel = document.querySelector('#archModel');
         const frozenAnchor = document.querySelector('#frozenAnchor');
         const resetBtn = document.querySelector('#reset-btn');
-    
-        let targetVisible = false;
-        let modelReady = Boolean(archModel.getObject3D('mesh'));
         let isAnchored = false;
-    
-        function freezeModel() {
-            if (isAnchored || !targetVisible || !modelReady) {
-                return;
-            }
-    
-            // Даём MindAR завершить обновление матрицы текущего кадра.
+
+        target.addEventListener('targetFound', () => {
+            if (isAnchored) return;
+
+            // Даем 1 кадр на обновление матрицы MindAR
             requestAnimationFrame(() => {
-                if (isAnchored || !targetVisible) {
-                    return;
-                }
-    
-                sceneEl.object3D.updateMatrixWorld(true);
-                target.object3D.updateWorldMatrix(true, true);
-    
+                if (isAnchored) return;
+
+                // 1. Считываем мировые координаты маркера в данный момент
                 const worldPosition = new THREE.Vector3();
                 const worldQuaternion = new THREE.Quaternion();
                 const worldScale = new THREE.Vector3();
-    
-                // Сохраняем мировую матрицу самого маркера.
-                target.object3D.matrixWorld.decompose(
-                    worldPosition,
-                    worldQuaternion,
-                    worldScale
-                );
-    
-                // Создаём неподвижную копию трансформации маркера
-                // непосредственно в сцене.
-                frozenAnchor.setAttribute('visible', true);
-    
+
+                target.object3D.updateWorldMatrix(true, true);
+                target.object3D.matrixWorld.decompose(worldPosition, worldQuaternion, worldScale);
+
+                // 2. Переносим зафиксированный контейнер в эти координаты
                 frozenAnchor.object3D.position.copy(worldPosition);
                 frozenAnchor.object3D.quaternion.copy(worldQuaternion);
                 frozenAnchor.object3D.scale.copy(worldScale);
-    
-                frozenAnchor.object3D.updateMatrix();
                 frozenAnchor.object3D.updateMatrixWorld(true);
-    
-                // Локальные position / rotation / scale модели сохраняются.
-                frozenAnchor.appendChild(archModel);
-    
-                archModel.object3D.visible = true;
-                archModel.object3D.updateMatrixWorld(true);
-    
+
+                // 3. Делаем контейнер видимым (модель уже загружена внутри!)
+                frozenAnchor.setAttribute('visible', 'true');
+
+                // 4. Скрываем UI сканирования
                 document.body.classList.add('hide-scanning');
-    
+
                 isAnchored = true;
                 resetBtn.style.display = 'block';
-    
-                console.log('Арка зафиксирована:', {
-                    position: worldPosition,
-                    quaternion: worldQuaternion,
-                    scale: worldScale
-                });
+
+                console.log('Арка зафиксирована без перезагрузки DOM');
             });
-        }
-    
-        archModel.addEventListener('model-loaded', () => {
-            modelReady = true;
-            console.log('GLB успешно загружен');
-            freezeModel();
-        });
-    
-        archModel.addEventListener('model-error', event => {
-            console.error('Ошибка загрузки GLB:', event.detail || event);
-        });
-    
-        target.addEventListener('targetFound', () => {
-            targetVisible = true;
-            freezeModel();
-        });
-    
-        target.addEventListener('targetLost', () => {
-            targetVisible = false;
         });
     </script>
 </body>
