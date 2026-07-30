@@ -49,60 +49,110 @@
             <a-asset-item id="arcaModel" src="arcageo.glb"></a-asset-item>
         </a-assets>
 
-        <a-camera position="0 0 0" look-controls="enabled: true"></a-camera>
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
         <a-entity id="target" mindar-image-target="targetIndex: 0">
             <a-gltf-model 
                 id="archModel" 
                 src="#arcaModel" 
-                position="0 0 0" 
-                scale="1 1 1" 
+                position="0.95 0 0.05" 
+                scale="0.16 0.16 0.16" 
                 rotation="0 0 0">
             </a-gltf-model>
         </a-entity>
 
+        <a-entity id="frozenAnchor" visible="false"></a-entity>
+
+        <a-box
+            position="0 0 0.1"
+            scale="0.2 0.2 0.2"
+            color="red">
+        </a-box>
     </a-scene>
 
     <script>
+        const sceneEl = document.querySelector('a-scene');
         const target = document.querySelector('#target');
         const archModel = document.querySelector('#archModel');
-        const scene = document.querySelector('a-scene');
+        const frozenAnchor = document.querySelector('#frozenAnchor');
         const resetBtn = document.querySelector('#reset-btn');
+    
+        let targetVisible = false;
+        let modelReady = Boolean(archModel.getObject3D('mesh'));
         let isAnchored = false;
-
-        target.addEventListener("targetFound", () => {
-            if (isAnchored) return;
-
-            // 1. Считываем абсолютные мировой координаты и углы поворота
-            const worldPosition = new THREE.Vector3();
-            const worldQuaternion = new THREE.Quaternion();
-            const worldEuler = new THREE.Euler();
-            const worldScale = new THREE.Vector3();
-
-            archModel.object3D.getWorldPosition(worldPosition);
-            archModel.object3D.getWorldQuaternion(worldQuaternion);
-            worldEuler.setFromQuaternion(worldQuaternion, 'YXZ');
-            archModel.object3D.getWorldScale(worldScale);
-
-            // Переводим радианы в градусы для A-Frame
-            const rotX = THREE.MathUtils.radToDeg(worldEuler.x);
-            const rotY = THREE.MathUtils.radToDeg(worldEuler.y);
-            const rotZ = THREE.MathUtils.radToDeg(worldEuler.z);
-
-            // 2. Переносим сам HTML-тег модели прямо в <a-scene>
-            scene.appendChild(archModel);
-
-            // 3. Задаем атрибуты через A-Frame API, чтобы координаты не сбрасывались
-            archModel.setAttribute('position', `${worldPosition.x} ${worldPosition.y} ${worldPosition.z}`);
-            archModel.setAttribute('rotation', `${rotX} ${rotY} ${rotZ}`);
-            archModel.setAttribute('scale', `${worldScale.x} ${worldScale.y} ${worldScale.z}`);
-            archModel.setAttribute('visible', 'true');
-
-            // 4. Скрываем рамку сканирования
-            document.body.classList.add('hide-scanning');
-
-            isAnchored = true;
-            resetBtn.style.display = 'block';
+    
+        function freezeModel() {
+            if (isAnchored || !targetVisible || !modelReady) {
+                return;
+            }
+    
+            // Даём MindAR завершить обновление матрицы текущего кадра.
+            requestAnimationFrame(() => {
+                if (isAnchored || !targetVisible) {
+                    return;
+                }
+    
+                sceneEl.object3D.updateMatrixWorld(true);
+                target.object3D.updateWorldMatrix(true, true);
+    
+                const worldPosition = new THREE.Vector3();
+                const worldQuaternion = new THREE.Quaternion();
+                const worldScale = new THREE.Vector3();
+    
+                // Сохраняем мировую матрицу самого маркера.
+                target.object3D.matrixWorld.decompose(
+                    worldPosition,
+                    worldQuaternion,
+                    worldScale
+                );
+    
+                // Создаём неподвижную копию трансформации маркера
+                // непосредственно в сцене.
+                frozenAnchor.setAttribute('visible', true);
+    
+                frozenAnchor.object3D.position.copy(worldPosition);
+                frozenAnchor.object3D.quaternion.copy(worldQuaternion);
+                frozenAnchor.object3D.scale.copy(worldScale);
+    
+                frozenAnchor.object3D.updateMatrix();
+                frozenAnchor.object3D.updateMatrixWorld(true);
+    
+                // Локальные position / rotation / scale модели сохраняются.
+                frozenAnchor.appendChild(archModel);
+    
+                archModel.object3D.visible = true;
+                archModel.object3D.updateMatrixWorld(true);
+    
+                document.body.classList.add('hide-scanning');
+    
+                isAnchored = true;
+                resetBtn.style.display = 'block';
+    
+                console.log('Арка зафиксирована:', {
+                    position: worldPosition,
+                    quaternion: worldQuaternion,
+                    scale: worldScale
+                });
+            });
+        }
+    
+        archModel.addEventListener('model-loaded', () => {
+            modelReady = true;
+            console.log('GLB успешно загружен');
+            freezeModel();
+        });
+    
+        archModel.addEventListener('model-error', event => {
+            console.error('Ошибка загрузки GLB:', event.detail || event);
+        });
+    
+        target.addEventListener('targetFound', () => {
+            targetVisible = true;
+            freezeModel();
+        });
+    
+        target.addEventListener('targetLost', () => {
+            targetVisible = false;
         });
     </script>
 </body>
