@@ -24,7 +24,6 @@
         arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;">
         
         <a-assets>
-            <!-- Загружаем модель арки -->
             <a-asset-item id="arcaModel" src="arcageo.glb"></a-asset-item>
         </a-assets>
 
@@ -34,13 +33,8 @@
     gps-camera="enableHighAccuracy: true; positionMinAccuracy: 1000; minDistance: 0;" 
     rotation-reader>
 </a-camera>
-
         
-        <!-- 
-            Модель арки, привязанная к гео-точке.
-            В Geo-AR 1 единица = 1 метр! 
-            Ваша арка из Blender (~5.7 м в высоту) при scale="1 1 1" будет ровно в реальный размер.
-        -->
+        <!-- ИСПРАВЛЕННАЯ АРКА: масштаб увеличен до 5, добавлено frustum-culled="false" -->
         <a-entity
             gps-entity-place="latitude: 45.22850; longitude: 11.65660;"
             gltf-model="#arcaModel"
