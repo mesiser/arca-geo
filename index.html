@@ -29,7 +29,6 @@
             display: none;
         }
 
-        /* Скрываем рамку сканирования после того, как маркер поймали */
         .hide-scanning .mindar-ui-scanning {
             display: none !important;
         }
@@ -74,24 +73,32 @@
         target.addEventListener("targetFound", () => {
             if (isAnchored) return;
 
-            // 1. Считываем координаты модели в пространстве кадра
+            // 1. Считываем абсолютные мировой координаты и углы поворота
             const worldPosition = new THREE.Vector3();
             const worldQuaternion = new THREE.Quaternion();
+            const worldEuler = new THREE.Euler();
             const worldScale = new THREE.Vector3();
 
             archModel.object3D.getWorldPosition(worldPosition);
             archModel.object3D.getWorldQuaternion(worldQuaternion);
+            worldEuler.setFromQuaternion(worldQuaternion, 'YXZ');
             archModel.object3D.getWorldScale(worldScale);
 
-            // 2. Вынимаем модель из маркера и переносим прямо в сцену
-            scene.object3D.add(archModel.object3D);
+            // Переводим радианы в градусы для A-Frame
+            const rotX = THREE.MathUtils.radToDeg(worldEuler.x);
+            const rotY = THREE.MathUtils.radToDeg(worldEuler.y);
+            const rotZ = THREE.MathUtils.radToDeg(worldEuler.z);
 
-            // 3. Задаем ей мировые координаты
-            archModel.object3D.position.copy(worldPosition);
-            archModel.object3D.quaternion.copy(worldQuaternion);
-            archModel.object3D.scale.copy(worldScale);
+            // 2. Переносим сам HTML-тег модели прямо в <a-scene>
+            scene.appendChild(archModel);
 
-            // 4. Скрываем рамку сканера, НЕ выключая трансляцию видео
+            // 3. Задаем атрибуты через A-Frame API, чтобы координаты не сбрасывались
+            archModel.setAttribute('position', `${worldPosition.x} ${worldPosition.y} ${worldPosition.z}`);
+            archModel.setAttribute('rotation', `${rotX} ${rotY} ${rotZ}`);
+            archModel.setAttribute('scale', `${worldScale.x} ${worldScale.y} ${worldScale.z}`);
+            archModel.setAttribute('visible', 'true');
+
+            // 4. Скрываем рамку сканирования
             document.body.classList.add('hide-scanning');
 
             isAnchored = true;
