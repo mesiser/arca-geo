@@ -41,71 +41,140 @@
     <a-scene 
         mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiScanning: yes;" 
         color-space="sRGB" 
-        renderer="colorManagement: true, physicallyCorrectLights: false" 
+        renderer="colorManagement: true, physicallyCorrectLights" 
         vr-mode-ui="enabled: false" 
         device-orientation-permission-ui="enabled: true">
 
-        <a-assets>
+        <!-- <a-assets>
             <a-asset-item id="arcaModel" src="arcageo.glb"></a-asset-item>
-        </a-assets>
-
-        <a-light type="ambient" intensity="1.5"></a-light>
-        <a-light type="directional" position="1 4 2" intensity="1.0"></a-light>
+        </a-assets> -->
 
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-        <a-entity id="target" mindar-image-target="targetIndex: 0"></a-entity>
+        <a-entity
+            id="target"
+            mindar-image-target="targetIndex: 0">
 
-        <a-entity id="frozenAnchor" visible="false">
-            <a-gltf-model 
-                id="archModel" 
-                src="#arcaModel" 
-                position="0.95 0 0.05" 
-                scale="0.16 0.16 0.16" 
-                rotation="0 0 0">
-            </a-gltf-model>
+            <a-entity
+                id="placement"
+                position="0.95 0 0.05"
+                rotation="0 0 0"
+                scale="0.16 0.16 0.16">
+            </a-entity>
+
         </a-entity>
 
+        <a-gltf-model
+            id="archModel"
+            src="./arcageo.glb"
+            visible="false">
+        </a-gltf-model>
+
+        <a-entity id="frozenAnchor" visible="false"></a-entity>
+
+        <a-box
+            position="0 0 0.1"
+            scale="0.2 0.2 0.2"
+            color="red">
+        </a-box>
     </a-scene>
 
     <script>
+        const sceneEl = document.querySelector('a-scene');
         const target = document.querySelector('#target');
-        const frozenAnchor = document.querySelector('#frozenAnchor');
+        const placement = document.querySelector('#placement');
+        const archModel = document.querySelector('#archModel');
         const resetBtn = document.querySelector('#reset-btn');
+    
+        let targetVisible = false;
+        let modelReady = Boolean(archModel.getObject3D('mesh'));
         let isAnchored = false;
-
-        target.addEventListener('targetFound', () => {
-            if (isAnchored) return;
-
-            // Даем 1 кадр на обновление матрицы MindAR
+        let freezeScheduled = false;
+    
+        const worldPosition = new THREE.Vector3();
+        const worldQuaternion = new THREE.Quaternion();
+        const worldScale = new THREE.Vector3();
+    
+        function tryFreezeModel() {
+            if (
+                isAnchored ||
+                freezeScheduled ||
+                !targetVisible ||
+                !modelReady
+            ) {
+                return;
+            }
+    
+            freezeScheduled = true;
+    
+            // Ждём, чтобы MindAR успел обновить трансформацию маркера
             requestAnimationFrame(() => {
-                if (isAnchored) return;
-
-                // 1. Считываем мировые координаты маркера в данный момент
-                const worldPosition = new THREE.Vector3();
-                const worldQuaternion = new THREE.Quaternion();
-                const worldScale = new THREE.Vector3();
-
-                target.object3D.updateWorldMatrix(true, true);
-                target.object3D.matrixWorld.decompose(worldPosition, worldQuaternion, worldScale);
-
-                // 2. Переносим зафиксированный контейнер в эти координаты
-                frozenAnchor.object3D.position.copy(worldPosition);
-                frozenAnchor.object3D.quaternion.copy(worldQuaternion);
-                frozenAnchor.object3D.scale.copy(worldScale);
-                frozenAnchor.object3D.updateMatrixWorld(true);
-
-                // 3. Делаем контейнер видимым (модель уже загружена внутри!)
-                frozenAnchor.setAttribute('visible', 'true');
-
-                // 4. Скрываем UI сканирования
+                freezeScheduled = false;
+    
+                if (isAnchored || !targetVisible || !modelReady) {
+                    return;
+                }
+    
+                // Обновляем мировые матрицы всей сцены
+                sceneEl.object3D.updateMatrixWorld(true);
+                placement.object3D.updateWorldMatrix(true, false);
+    
+                // Получаем мировое положение точки placement
+                placement.object3D.matrixWorld.decompose(
+                    worldPosition,
+                    worldQuaternion,
+                    worldScale
+                );
+    
+                // Модель уже находится в корне сцены,
+                // поэтому просто присваиваем ей мировую трансформацию
+                archModel.object3D.position.copy(worldPosition);
+                archModel.object3D.quaternion.copy(worldQuaternion);
+                archModel.object3D.scale.copy(worldScale);
+    
+                archModel.object3D.updateMatrix();
+                archModel.object3D.updateMatrixWorld(true);
+    
+                archModel.setAttribute('visible', true);
+                archModel.object3D.visible = true;
+    
                 document.body.classList.add('hide-scanning');
-
+    
                 isAnchored = true;
                 resetBtn.style.display = 'block';
-
-                console.log('Арка зафиксирована без перезагрузки DOM');
+    
+                console.log('Арка зафиксирована', {
+                    position: worldPosition.clone(),
+                    quaternion: worldQuaternion.clone(),
+                    scale: worldScale.clone()
+                });
             });
+        }
+    
+        archModel.addEventListener('model-loaded', () => {
+            modelReady = true;
+            console.log('GLB успешно загружен');
+            tryFreezeModel();
+        });
+    
+        archModel.addEventListener('model-error', event => {
+            console.error(
+                'Ошибка загрузки GLB:',
+                event.detail || event
+            );
+        });
+    
+        target.addEventListener('targetFound', () => {
+            console.log('Маркер найден');
+            targetVisible = true;
+            tryFreezeModel();
+        });
+    
+        target.addEventListener('targetLost', () => {
+            console.log('Маркер потерян');
+            targetVisible = false;
+    
+            // После фиксации арку не скрываем
         });
     </script>
 </body>
